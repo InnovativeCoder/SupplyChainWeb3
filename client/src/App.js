@@ -1,31 +1,40 @@
 import React, { Component } from "react";
-import SimpleStorageContract from "./contracts/SimpleStorage.json";
+import "./App.css";
+import ItemContract from "./contracts/Item.json";
+import ItemManagerContract from "./contracts/ItemManager.json";
 import getWeb3 from "./getWeb3";
 
-import "./App.css";
 
 class App extends Component {
-  state = { storageValue: 0, web3: null, accounts: null, contract: null };
+  state = {
+    loaded: false,
+    cost: 0,
+    itemName: "example_1"
+  };
 
   componentDidMount = async () => {
     try {
       // Get network provider and web3 instance.
-      const web3 = await getWeb3();
+      this.web3 = await getWeb3();
 
       // Use web3 to get the user's accounts.
-      const accounts = await web3.eth.getAccounts();
+      this.accounts = await this.web3.eth.getAccounts();
 
       // Get the contract instance.
-      const networkId = await web3.eth.net.getId();
-      const deployedNetwork = SimpleStorageContract.networks[networkId];
-      const instance = new web3.eth.Contract(
-        SimpleStorageContract.abi,
-        deployedNetwork && deployedNetwork.address,
+      this.networkId = await this.web3.eth.net.getId();
+
+      this.ItemManager = new this.web3.eth.Contract(
+        ItemManagerContract.abi,
+        ItemManagerContract.networks[this.networkId] && ItemManagerContract.networks[this.networkId].address,
+      );
+      this.Item = new this.web3.eth.Contract(
+        ItemContract.abi,
+        ItemContract.networks[this.networkId] && ItemContract.networks[this.networkId].address,
       );
 
       // Set web3, accounts, and contract to the state, and then proceed with an
       // example of interacting with the contract's methods.
-      this.setState({ web3, accounts, contract: instance }, this.runExample);
+      this.setState({ loaded: true });
     } catch (error) {
       // Catch any errors for any of the above operations.
       alert(
@@ -48,23 +57,34 @@ class App extends Component {
     this.setState({ storageValue: response });
   };
 
+  handleImputChange = (event) => {
+    const target = event.target;
+    const value = target.type === "checkbox" ? target.checked : target.value;
+    const name = target.name;
+    this.setState({
+      [name]: value,
+    })
+  }
+
+  handleSubmit = async () => {
+    const { cost, itemName } = this.setState;
+    console.log("reached")
+    const res = await this.ItemManager.methods.createItem(itemName, cost).send({ from: this.accounts[2] })
+    console.log("res is ", res)
+  }
+
   render() {
-    if (!this.state.web3) {
+    if (!this.state.loaded) {
       return <div>Loading Web3, accounts, and contract...</div>;
     }
     return (
       <div className="App">
-        <h1>Good to Go!</h1>
-        <p>Your Truffle Box is installed and ready.</p>
-        <h2>Smart Contract Example</h2>
-        <p>
-          If your contracts compiled and migrated successfully, below will show
-          a stored value of 5 (by default).
-        </p>
-        <p>
-          Try changing the value stored on <strong>line 42</strong> of App.js.
-        </p>
-        <div>The stored value is: {this.state.storageValue}</div>
+        <h1>Supply Chain</h1>
+        <h2>Items</h2>
+        <h2>Add Items</h2>
+        Cost in Wei : <input type="text" name="cost" value={this.state.cost} onChange={this.handleImputChange} />
+        Item identifier <input type="text" name="itemName" value={this.state.itemName} onChange={this.handleImputChange} />
+        <button type="button" onClick={this.handleSubmit}>Create new item</button>
       </div>
     );
   }
